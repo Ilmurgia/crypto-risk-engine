@@ -6,6 +6,7 @@ from src.state_manager import StateManager
 from apscheduler.schedulers.background import BackgroundScheduler
 from src.data_fetcher import get_latest_candle
 
+SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 MODEL_PATH = "models/tail_model_v1.pkl"
 DATA_PATH = "datas/btc_4h_full.csv"
 
@@ -17,12 +18,16 @@ app = FastAPI()
 
 # ---- load or initialize state ----
 
-state = state_manager.load_state()
+states = state_manager.load_all()
 
-if state is None:
-    df = pd.read_csv(DATA_PATH)
-    state = engine.initialize_state(df)
-    state_manager.save_state(state)
+for symbol in SYMBOLS:
+
+    if symbol not in states:
+
+        df = pd.read_csv(DATA_PATH)
+        states[symbol] = engine.initialize_state(df)
+
+state_manager.save_all(states)
 
 
 # ---- endpoints ----
@@ -35,6 +40,15 @@ def health():
 @app.get("/signal")
 def get_signal():
     return state
+
+
+@app.get("/signal/{symbol}")
+def get_signal_symbol(symbol: str):
+
+    if symbol not in states:
+        return {"error": "symbol not supported"}
+
+    return states[symbol]
 
 
 @app.post("/update")
@@ -50,22 +64,30 @@ def update_signal(candle: dict):
 
 def scheduled_update():
 
-    global state
+    global states
 
-    candle = get_latest_candle()
+    for symbol in SYMBOLS:
 
-    result, state = engine.update_with_new_candle(state, candle)
+        candle = get_latest_candle(symbol)
 
-    state_manager.save_state(state)
+        result, states[symbol] = engine.update_with_new_candle(
+            states[symbol],
+            candle
+        )
 
-    print("AUTO UPDATE:", result)
+        print(symbol, result)
 
-    scheduler = BackgroundScheduler()
+    state_manager.save_all(states)
 
-    scheduler.add_job(
-        scheduled_update,
-        "interval",
-        hours=4
-    )
 
-    scheduler.start()
+# ---- scheduler ----
+
+scheduler = BackgroundScheduler()
+
+scheduler.add_job(
+    scheduled_update,
+    "interval",
+    hours=4
+)
+
+scheduler.start()

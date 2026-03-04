@@ -8,13 +8,16 @@ class StateManager:
     def __init__(self, state_path: str = "state.json"):
         self.state_path = Path(state_path)
 
-    def save_state(self, state: dict):
+    def load_all(self):
+        if not self.state_path.exists():
+            return {}
+        with open(self.state_path, "r") as f:
+            return json.load(f)
 
-        state_to_save = state.copy()
-        state_to_save["last_update"] = datetime.utcnow().isoformat()
-
+    def save_all(self, states: dict):
+        states["last_update"] = datetime.utcnow().isoformat()
         with open(self.state_path, "w") as f:
-            json.dump(state_to_save, f, indent=4)
+            json.dump(states, f, indent=4)
 
     def load_state(self):
 

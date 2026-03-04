@@ -1,12 +1,12 @@
 import requests
 
 
-def get_latest_candle():
+def get_latest_candle(symbol):
 
     url = "https://api.binance.com/api/v3/klines"
 
     params = {
-        "symbol": "BTCUSDT",
+        "symbol": symbol,
         "interval": "4h",
         "limit": 1
     }
